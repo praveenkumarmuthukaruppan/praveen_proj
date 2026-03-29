@@ -4,32 +4,69 @@ pipeline {
 
     parameters {
         choice(
-            name: 'MODE',
-            choices: ['initial', 'incremental'],
-            description: 'Select pipeline mode'
+            name: 'LOAD_TYPE',
+            choices: ['INITIAL', 'INCREMENTAL'],
+            description: 'Choose pipeline mode'
         )
     }
 
     environment {
-        SPARK_HOME = "/usr/lib/spark"
+        REMOTE_HOST = '13.42.152.118'           // EC2 / Spark host
+        REMOTE_USER = 'ec2-user'
+        CODE_PATH = '/home/ec2-user/praveen_proj/code'
+        HADOOP_CONF_DIR = '/etc/hadoop/conf'
+        YARN_CONF_DIR = '/etc/hadoop/conf'
     }
 
     stages {
-        stage('Checkout') {
+
+        stage('Prepare') {
             steps {
-                git branch: 'main', url: 'https://github.com/praveenkumarmuthukaruppan/praveen_proj.git'
+                echo "Starting Retail Pipeline Jenkins Build"
+            }
+        }
+
+        stage('Install Dependencies') {
+            steps {
+                sh """
+                ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} '
+                    cd ${CODE_PATH} &&
+                    python3 -m pip install -r requirements.txt || true
+                '
+                """
+            }
+        }
+
+        stage('Run Pytest Data Quality Checks') {
+            steps {
+                sh """
+                ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} '
+                    cd ${CODE_PATH} &&
+                    python3 -m pytest -v tests/test_dq.py
+                '
+                """
             }
         }
 
         stage('Run Pipeline') {
             steps {
                 script {
-                    if (params.MODE == 'initial') {
-                        echo "Running INITIAL pipeline"
-                        sh "${SPARK_HOME}/bin/spark-submit initial.py"
-                    } else {
-                        echo "Running INCREMENTAL pipeline"
-                        sh "${SPARK_HOME}/bin/spark-submit incremental.py"
+                    if (params.LOAD_TYPE == 'INITIAL') {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} '
+                            cd ${CODE_PATH} &&
+                            export PYSPARK_PYTHON=/usr/bin/python3 &&
+                            python3 initial.py
+                        '
+                        """
+                    } else if (params.LOAD_TYPE == 'INCREMENTAL') {
+                        sh """
+                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} '
+                            cd ${CODE_PATH} &&
+                            export PYSPARK_PYTHON=/usr/bin/python3 &&
+                            python3 incremental.py
+                        '
+                        """
                     }
                 }
             }
@@ -38,10 +75,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully "
+            echo "Retail pipeline executed successfully with LOAD_TYPE=${params.LOAD_TYPE}"
         }
         failure {
-            echo "Pipeline failed"
+            echo "Retail pipeline failed. Check Jenkins console logs."
         }
     }
 }
