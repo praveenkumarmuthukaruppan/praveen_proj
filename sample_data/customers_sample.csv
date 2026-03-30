@@ -1,0 +1,4 @@
+customer_id,first_name,last_name,age,gender,country
+1,John,Doe,25,M,USA
+2,Jane,Smith,30,F,UK
+3,Bob,Johnson,45,M,USA
