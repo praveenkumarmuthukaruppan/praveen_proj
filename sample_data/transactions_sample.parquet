@@ -1,0 +1,14 @@
+from pyspark.sql import SparkSession
+
+spark = SparkSession.builder.appName("sample").getOrCreate()
+
+data = [
+    (1, 1, 101, "2026-03-01", 250.0, 0, "Card", 0),
+    (2, 2, 102, "2026-03-02", 450.0, 1, "Cash", 0),
+    (3, 3, 103, "2026-03-02", 300.0, 0, "Card", 1)
+]
+
+columns = ["transaction_id","customer_id","product_id","order_date","order_value","discount_applied","payment_method","fraud_label"]
+
+df = spark.createDataFrame(data, columns)
+df.write.mode("overwrite").parquet("sample_data/transactions_sample.parquet")
